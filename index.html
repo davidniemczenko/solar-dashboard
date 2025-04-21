@@ -5,10 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Smart Home Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       background-color: #0a2540;
       font-family: sans-serif;
+    }
+    canvas {
+      background-color: #1e3a8a;
+      border-radius: 1rem;
+      padding: 1rem;
     }
   </style>
 </head>
@@ -31,20 +37,99 @@
         const dashboard = document.getElementById("dashboard");
         dashboard.innerHTML = "";
 
-        const tiles = [
-          { label: "Battery SoC", value: `${latest.soc}%`, icon: "🔋" },
-          { label: "PV Power", value: `${latest.current_pv} kW`, icon: "☀️" },
-          { label: "Battery Discharge", value: `${latest.bat_discharge_power} kW`, icon: "🔻" },
-          { label: "Load Power", value: `${latest.load_power} kW`, icon: "⚡" },
-          { label: "Grid Power", value: `${latest.grid_power} kW`, icon: "🔌" },
-          { label: "Immersion Heater", value: latest.immersion_on ? "ON" : "OFF", icon: "♨️" },
-          { label: "Shelly Energy", value: `${latest.shelly_kwh} kWh`, icon: "📈" },
-          { label: "Last Update", value: new Date(latest.timestamp).toLocaleTimeString(), icon: "⏱️" }
+        const metrics = [
+          { key: "soc", label: "Battery SoC", icon: "🔋", color: "#38bdf8" },
+          { key: "current_pv", label: "PV Power (kW)", icon: "☀️", color: "#facc15" },
+          { key: "bat_discharge_power", label: "Battery Discharge (kW)", icon: "🔻", color: "#f87171" },
+          { key: "load_power", label: "Load Power (kW)", icon: "⚡", color: "#34d399" },
+          { key: "grid_power", label: "Grid Power (kW)", icon: "🔌", color: "#c084fc" },
+          { key: "shelly_kwh", label: "Immersion Usage (Wh)", icon: "📈", color: "#f472b6", transform: (v, i, arr) => i === 0 ? 0 : Math.max(0, v - arr[i - 1]),
+            total: (arr) => (arr[arr.length - 1] - arr[0]).toFixed(2) }
         ];
 
-        tiles.forEach(({ label, value, icon }) => {
+        metrics.forEach(({ key, label, icon, color, transform, total }) => {
+          const rawValues = data.map(d => d[key]);
+          const values = transform ? rawValues.map((v, i, arr) => transform(v, i, arr)) : rawValues;
+          const times = data.map(d => new Date(d.timestamp).toLocaleTimeString());
+          const avg = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
+          const currentValue = total ? total(rawValues) : latest[key];
+
           const tile = document.createElement("div");
-          tile.className = "bg-blue-800 p-6 rounded-2xl shadow-md";
+          tile.className = "bg-blue-800 p-4 rounded-2xl shadow-md flex flex-col items-center";
+
+          tile.innerHTML = `
+            <div class="text-3xl mb-2">${icon}</div>
+            <div class="text-lg font-bold">${label}</div>
+            <div class="text-2xl mb-2">${currentValue}${key === 'soc' ? '%' : key.includes('kwh') ? ' Wh' : ' kW'}</div>
+          `;
+
+          const canvas = document.createElement("canvas");
+          tile.appendChild(canvas);
+          dashboard.appendChild(tile);
+
+          new Chart(canvas.getContext("2d"), {
+            type: "line",
+            data: {
+              labels: times,
+              datasets: [
+                {
+                  label: null,
+                  data: values,
+                  borderColor: color,
+                  fill: false,
+                  tension: 0.2,
+                  pointRadius: 0
+                },
+                {
+                  label: "Average",
+                  data: Array(values.length).fill(avg),
+                  borderDash: [5, 5],
+                  borderColor: "#888",
+                  fill: false,
+                  borderWidth: 1,
+                  pointRadius: 0
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false }
+              },
+              scales: {
+                x: {
+                  display: true,
+                  ticks: { color: "#ffffff" },
+                  grid: { color: "rgba(255,255,255,0.05)" }
+                },
+                y: {
+                  beginAtZero: true,
+                  ticks: { color: "#ffffff" },
+                  grid: { color: "rgba(255,255,255,0.1)" }
+                }
+              }
+            }
+          });
+        });
+
+        // Add immersion on/off and last update as separate tiles
+        const statusTiles = [
+          {
+            label: "Immersion Heater",
+            value: latest.immersion_on ? "ON" : "OFF",
+            icon: "♨️"
+          },
+          {
+            label: "Last Update",
+            value: new Date(latest.timestamp).toLocaleTimeString(),
+            icon: "⏱️"
+          }
+        ];
+
+        statusTiles.forEach(({ label, value, icon }) => {
+          const tile = document.createElement("div");
+          tile.className = "bg-blue-800 p-6 rounded-2xl shadow-md flex flex-col items-center";
           tile.innerHTML = `
             <div class="text-3xl mb-2">${icon}</div>
             <div class="text-lg font-bold">${label}</div>
@@ -64,11 +149,8 @@
       }
     }
 
-    // Initial load
     loadDashboard();
-
-    // 🔁 Auto-refresh every 5 minutes (300,000 ms)
-    setInterval(loadDashboard, 300000);
+    setInterval(loadDashboard, 300000); // Auto-refresh every 5 minutes
   </script>
 </body>
 </html>
