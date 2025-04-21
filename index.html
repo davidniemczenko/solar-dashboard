@@ -13,7 +13,9 @@
   </style>
 </head>
 <body class="text-white text-center text-xl p-4">
-  <div id="dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto"></div>
+  <div id="dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
+    <div class="col-span-3 text-gray-400 text-lg">Loading dashboard data...</div>
+  </div>
 
   <script>
     async function loadDashboard() {
@@ -22,20 +24,21 @@
 
       try {
         const response = await fetch(blobUrl);
-        const data = await response.json();
+        if (!response.ok) throw new Error("Blob not found or inaccessible");
 
+        const data = await response.json();
         const latest = data[data.length - 1];
         const dashboard = document.getElementById("dashboard");
-        dashboard.innerHTML = ""; // clear any existing content
+        dashboard.innerHTML = "";
 
         const tiles = [
           { label: "Battery SoC", value: `${latest.soc}%`, icon: "🔋" },
           { label: "PV Power", value: `${latest.current_pv} kW`, icon: "☀️" },
+          { label: "Battery Discharge", value: `${latest.bat_discharge_power} kW`, icon: "🔻" },
           { label: "Load Power", value: `${latest.load_power} kW`, icon: "⚡" },
           { label: "Grid Power", value: `${latest.grid_power} kW`, icon: "🔌" },
-          { label: "Battery Discharge", value: `${latest.bat_discharge_power} kW`, icon: "🔻" },
           { label: "Immersion Heater", value: latest.immersion_on ? "ON" : "OFF", icon: "♨️" },
-          { label: "Shelly Total", value: `${latest.shelly_kwh} kWh`, icon: "📈" },
+          { label: "Shelly Energy", value: `${latest.shelly_kwh} kWh`, icon: "📈" },
           { label: "Last Update", value: new Date(latest.timestamp).toLocaleTimeString(), icon: "⏱️" }
         ];
 
@@ -51,16 +54,21 @@
         });
 
       } catch (err) {
-        document.getElementById("dashboard").innerHTML = `
+        const dashboard = document.getElementById("dashboard");
+        dashboard.innerHTML = `
           <div class="col-span-3 bg-red-700 p-4 rounded-xl shadow-md">
-            ❌ Failed to load dashboard data: ${err}
+            ❌ Could not load dashboard data.<br>${err.message}
           </div>
         `;
-        console.error("Fetch error:", err);
+        console.error("Dashboard fetch error:", err);
       }
     }
 
-    window.addEventListener("DOMContentLoaded", loadDashboard);
+    // Initial load
+    loadDashboard();
+
+    // 🔁 Auto-refresh every 5 minutes (300,000 ms)
+    setInterval(loadDashboard, 300000);
   </script>
 </body>
 </html>
