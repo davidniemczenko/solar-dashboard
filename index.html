@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Home Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #0a2540;
+      font-family: sans-serif;
+    }
+  </style>
+</head>
+<body class="text-white text-center text-xl p-4">
+  <div id="dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto"></div>
+
+  <script>
+    async function loadDashboard() {
+      const today = new Date().toISOString().split("T")[0];
+      const blobUrl = `https://solarimmersion.blob.core.windows.net/dashboard/dashboard-${today}.json`;
+
+      try {
+        const response = await fetch(blobUrl);
+        const data = await response.json();
+
+        const latest = data[data.length - 1];
+        const dashboard = document.getElementById("dashboard");
+        dashboard.innerHTML = ""; // clear any existing content
+
+        const tiles = [
+          { label: "Battery SoC", value: `${latest.soc}%`, icon: "🔋" },
+          { label: "PV Power", value: `${latest.current_pv} kW`, icon: "☀️" },
+          { label: "Load Power", value: `${latest.load_power} kW`, icon: "⚡" },
+          { label: "Grid Power", value: `${latest.grid_power} kW`, icon: "🔌" },
+          { label: "Battery Discharge", value: `${latest.bat_discharge_power} kW`, icon: "🔻" },
+          { label: "Immersion Heater", value: latest.immersion_on ? "ON" : "OFF", icon: "♨️" },
+          { label: "Shelly Total", value: `${latest.shelly_kwh} kWh`, icon: "📈" },
+          { label: "Last Update", value: new Date(latest.timestamp).toLocaleTimeString(), icon: "⏱️" }
+        ];
+
+        tiles.forEach(({ label, value, icon }) => {
+          const tile = document.createElement("div");
+          tile.className = "bg-blue-800 p-6 rounded-2xl shadow-md";
+          tile.innerHTML = `
+            <div class="text-3xl mb-2">${icon}</div>
+            <div class="text-lg font-bold">${label}</div>
+            <div class="text-2xl mt-1">${value}</div>
+          `;
+          dashboard.appendChild(tile);
+        });
+
+      } catch (err) {
+        document.getElementById("dashboard").innerHTML = `
+          <div class="col-span-3 bg-red-700 p-4 rounded-xl shadow-md">
+            ❌ Failed to load dashboard data: ${err}
+          </div>
+        `;
+        console.error("Fetch error:", err);
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", loadDashboard);
+  </script>
+</body>
+</html>
