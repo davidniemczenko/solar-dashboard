@@ -59,7 +59,7 @@
           const values = transform ? rawValues.map((v, i, arr) => transform(v, i, arr)) : rawValues;
           const times = data.map(d => new Date(d.timestamp).toLocaleTimeString());
           const max = Math.max(...values).toFixed(2);
-          const sum = values.reduce((a, b) => a + b, 0).toFixed(2);
+          const sum = (values.reduce((a, b) => a + b, 0) * (5 / 60)).toFixed(2);
           const currentValue = total ? total(rawValues) : latest[key];
 
           const valueDisplay = cumulative && key !== "soc"
